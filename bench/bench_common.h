@@ -2,6 +2,7 @@
 #define _BENCH_COMMON_H_
 
 #include "bench_config.h"
+#include "stats_latency.h"
 
 /* type of each query */
 enum query_types{
@@ -20,7 +21,7 @@ typedef struct __attribute__((__packed__)) {
 } query;
 
 /* bench result */
-typedef struct __attribute__((__packed__)) {
+typedef struct {
     double total_tput;
     double total_time;
     size_t total_hits;
@@ -28,5 +29,6 @@ typedef struct __attribute__((__packed__)) {
     size_t total_gets;
     size_t total_puts;
     size_t num_threads;
+    struct stat_time_hist get_lat;
 } result_t;
 #endif

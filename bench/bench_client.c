@@ -40,6 +40,7 @@ typedef struct {
   size_t num_hits;
   double tput;
   double time;
+  struct stat_time_hist get_lat;
 } thread_param;
 
 /* default parameter settings */
@@ -48,9 +49,18 @@ static size_t val_len;
 static size_t num_queries;
 static size_t num_threads = 1;
 static size_t num_mget = 1;
-static float duration = 10.0;
+static int duration = -1;
+static int target_tput = -1;
 static char* serverip = NULL;
 static char* inputfile = NULL;
+
+enum bench_mode {
+  LOAD,
+  RUN
+};
+static enum bench_mode mode = RUN; // 0 for load, 1 for run
+// Request interval (nsec) per thread
+double interval = 0.0;
 
 /* Calculate the second difference*/
 static double timeval_diff(struct timeval *start, 
@@ -179,8 +189,14 @@ static void* queries_exec(void *param)
   query* queries = p->queries;
   p->time = 0;
 
-  while (p->time < duration) {
-    gettimeofday(&tv_s, NULL);  // start timing
+  struct timespec tv_stt, tv_end, tv_prev;
+  clock_gettime(CLOCK_MONOTONIC , &tv_stt);
+  tv_prev.tv_sec = tv_stt.tv_sec;
+  tv_prev.tv_nsec = tv_stt.tv_nsec;
+
+  // For RUN mode, will exit after duration or finishing all queries
+  // For LOAD mode, will exit after finishing all queries
+  while (1) {
     for (size_t i = 0 ; i < p->num_ops; i++) {
       enum query_types type = queries[i].type;
       char *key = queries[i].hashed_key;
@@ -190,12 +206,15 @@ static void* queries_exec(void *param)
         memc_put(memc, key, buf);
         p->num_puts++;
       } else if (type == query_get) {
-        char *val = memc_get(memc, key);
+        char *val;
+        uint64_t lat_nsec;
+        TIME(val = memc_get(memc, key), lat_nsec);
+        STATS_TIME(&(p->get_lat), lat_nsec);
         p->num_gets++;
         if (val == NULL) {
           // cache miss, put something (gabage) in cache
           p->num_miss++;
-          memc_put(memc, key, buf);
+          // memc_put(memc, key, buf);
         } else {
           free(val);
           p->num_hits++;
@@ -203,11 +222,30 @@ static void* queries_exec(void *param)
       } else {
         fprintf(stderr, "unknown query type\n");
       }
+
+      // Check duration for exit
+      clock_gettime(CLOCK_MONOTONIC , &tv_end);
+      p->time = timespec_diff(&tv_stt, &tv_end) / 1000000000.0;
+      if (mode == RUN && duration >= 0 && p->time > duration) {
+        goto finish;
+      }
+
+      // Busy wait interval (nsec)
+      // We do not throttle LOAD mode
+      if (target_tput > 0 && mode == RUN) {
+        while (timespec_diff(&tv_prev, &tv_end) < interval) {
+          clock_gettime(CLOCK_MONOTONIC , &tv_end);
+        }
+        tv_prev.tv_sec = tv_end.tv_sec;
+        tv_prev.tv_nsec = tv_end.tv_nsec;
+      }
     }
-    gettimeofday(&tv_e, NULL);  // stop timing
-    p->time += timeval_diff(&tv_s, &tv_e);
+    if (mode == LOAD || (mode == RUN && duration == -1)) {
+      goto finish;
+    }
   }
 
+finish: ;
   size_t nops = p->num_gets + p->num_puts;
   p->tput = nops / p->time;
 
@@ -229,10 +267,15 @@ static void* queries_exec(void *param)
 
 static void usage(char* binname)
 {
-  printf("%s [-c IP] [-t #] [-b #] [-l trace] [-d #] [-h] [-s IP]\n", binname);
+  printf("%s [-m #] [-d #] [-r #] [-t #] [-s IP] [-l trasce] [-h]\n", binname);
+  printf("\t-m #: 0 (LOAD) or 1 (RUN), by default %d\n", mode);
+  printf("\t-d #: duration of the test in seconds, by default %d\n", duration);
+  printf("\t      -1 means exiting after finishing all queries\n");
+  printf("\t      For RUN, will keep testing repeatly until duration\n");
+  printf("\t      For LOAD, always be -1\n");
+  printf("\t-r #: request per seconds, by default %d\n", target_tput);
+  printf("\t      only throttle throughput in RUN mode\n");
   printf("\t-t #: number of working threads, by default %"PRIu64"\n", num_threads);
-  //printf("\t-b #: batch size for mget, by default %"PRIu64"\n", num_mget);
-  printf("\t-d #: duration of the test in seconds, by default %f\n", duration);
   printf("\t-s IP: memcached server, by default 127.0.0.1 (localhost), required\n");
   printf("\t-l trace: e.g., /path/to/ycsbtrace, required\n");
   printf("\t-h  : show usage\n");
@@ -248,10 +291,11 @@ main(int argc, char **argv)
   }
 
   char ch;
-  while ((ch = getopt(argc, argv, "b:t:d:s:c:l:")) != -1) {
+  while ((ch = getopt(argc, argv, "m:t:r:d:s:l:")) != -1) {
     switch (ch) {
+    case 'm': mode = atoi(optarg); break;
     case 't': num_threads = atoi(optarg); break;
-    //case 'b': num_mget    = atoi(optarg); break;
+    case 'r': target_tput = atoi(optarg); break;
     case 'd': duration    = atof(optarg); break;
     case 's': serverip    = optarg; break;
     case 'l': inputfile   = optarg; break;
@@ -276,6 +320,9 @@ main(int argc, char **argv)
 
   pthread_mutex_init(&printmutex, NULL);
 
+  // Request interval (nsec) for each thread
+  interval = (1000000000.0 * num_threads) / target_tput;
+
   size_t t;
   thread_param tp[num_threads];
   for (t = 0; t < num_threads; t++) {
@@ -292,12 +339,7 @@ main(int argc, char **argv)
   }
 
   result_t result;
-  result.total_time = 0.0;;
-  result.total_tput = 0.0;
-  result.total_hits = 0;
-  result.total_miss = 0;
-  result.total_gets = 0;
-  result.total_puts = 0;
+  memset(&result, 0, sizeof(result_t));
   result.num_threads = num_threads;
 
   for (t = 0; t < num_threads; t++) {
@@ -313,11 +355,19 @@ main(int argc, char **argv)
     result.total_miss += tp[t].num_miss;
     result.total_gets += tp[t].num_gets;
     result.total_puts += tp[t].num_puts;
+    histogram_aggregate(&(result.get_lat), &(tp[t].get_lat));
   }
 
   printf("total_time = %.2f\n", result.total_time);
   printf("total_tput = %.2f\n", result.total_tput);
   printf("total_hitratio = %.4f\n", (float) result.total_hits / result.total_gets);
+  if (result.get_lat.cnt > 0) {
+    printf("get lat avg %lu ns\n", get_hist_avg(&(result.get_lat)));
+    printf("get lat p50 %lu ns\n", find_hist_quantile(&(result.get_lat), 0.50));
+    printf("get lat p90 %lu ns\n", find_hist_quantile(&(result.get_lat), 0.90));
+    printf("get lat p99 %lu ns\n", find_hist_quantile(&(result.get_lat), 0.99));
+    printf("get lat p999 %lu ns\n", find_hist_quantile(&(result.get_lat), 0.999));
+  }
 
   pthread_attr_destroy(&attr);
   printf("bye\n");
