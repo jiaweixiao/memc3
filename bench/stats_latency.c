@@ -63,7 +63,7 @@ uint64_t find_hist_quantile(struct stat_time_hist* hist, float quantile) {
             return i * MSEC_UNIT;
         }
     }//End for i
-    return 1000000000;
+    return 1e9;
 }
 
 void histogram_aggregate(struct stat_time_hist *to, struct stat_time_hist *from) {
@@ -89,7 +89,7 @@ void histogram_aggregate(struct stat_time_hist *to, struct stat_time_hist *from)
 uint64_t timespec_diff(struct timespec *start, 
                            struct timespec *end)
 {
-  uint64_t r = (end->tv_sec - start->tv_sec)*1000000000;
+  uint64_t r = (end->tv_sec - start->tv_sec)*1e9;
 
   /* Calculate the microsecond difference */
   if (end->tv_nsec > start->tv_nsec)

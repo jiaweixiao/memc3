@@ -610,7 +610,7 @@ extern void drop_privileges(void);
     memory_barrier()
 
 #define after_write(it) \
-    memory_barrier();                           \
+    memory_barrier()
 
 #ifdef MEMC3_LOCK_OPT
 

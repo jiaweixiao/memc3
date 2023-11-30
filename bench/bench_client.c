@@ -225,7 +225,7 @@ static void* queries_exec(void *param)
 
       // Check duration for exit
       clock_gettime(CLOCK_MONOTONIC , &tv_end);
-      p->time = timespec_diff(&tv_stt, &tv_end) / 1000000000.0;
+      p->time = timespec_diff(&tv_stt, &tv_end) / 1e9;
       if (mode == RUN && duration >= 0 && p->time > duration) {
         goto finish;
       }
@@ -321,7 +321,7 @@ main(int argc, char **argv)
   pthread_mutex_init(&printmutex, NULL);
 
   // Request interval (nsec) for each thread
-  interval = (1000000000.0 * num_threads) / target_tput;
+  interval = 1.0 / target_tput / num_threads * 1e9;
 
   size_t t;
   thread_param tp[num_threads];

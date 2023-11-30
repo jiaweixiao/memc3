@@ -333,7 +333,7 @@ static pid_t start_server(in_port_t *port_out, bool daemon, int timeout) {
             argv[arg++] = "./timedrun";
             argv[arg++] = tmo;
         }
-        argv[arg++] = "./memcached-debug";
+        argv[arg++] = "./memc3-debug";
         argv[arg++] = "-p";
         argv[arg++] = "-1";
         argv[arg++] = "-U";
@@ -352,6 +352,7 @@ static pid_t start_server(in_port_t *port_out, bool daemon, int timeout) {
          argv[arg++] = "-vvv";
 #endif
         argv[arg++] = NULL;
+        fprintf(stderr, "execv %s\n", *argv);
         assert(execv(argv[0], argv) != -1);
     }
 

@@ -10,7 +10,7 @@
 #define NSEC_BIN (1000)
 #define USEC_BIN (1000)
 #define MSEC_BIN (1000)
-#define NSEC_UNIT (100)// in 100 ns
+#define NSEC_UNIT (100) // in 100 ns
 #define USEC_UNIT (10*1000) // in 10 us
 #define MSEC_UNIT (1*1000*1000) // in 1 ms
 
@@ -40,8 +40,8 @@ uint64_t timespec_diff(struct timespec *start, struct timespec *end);
         clock_gettime(CLOCK_MONOTONIC , &tv_stt); \
         do { statement; } while(0);	\
         clock_gettime(CLOCK_MONOTONIC , &tv_end); \
-        uint64_t stt_nsec = 1000000000*tv_stt.tv_sec + tv_stt.tv_nsec; \
-        uint64_t end_nsec = 1000000000*tv_end.tv_sec + tv_end.tv_nsec; \
+        uint64_t stt_nsec = 1e9*tv_stt.tv_sec + tv_stt.tv_nsec; \
+        uint64_t end_nsec = 1e9*tv_end.tv_sec + tv_end.tv_nsec; \
         difftime_nsec = end_nsec - stt_nsec; \
     } while (0)
 

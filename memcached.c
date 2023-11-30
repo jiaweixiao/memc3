@@ -5092,7 +5092,12 @@ int main (int argc, char **argv) {
 
     /* initialize other stuff */
     stats_init();
+#ifdef MEMC3_ASSOC_CHAIN
+    assoc_init(settings.hashpower_init);
+#endif
+#ifdef MEMC3_ASSOC_CUCKOO
     assoc2_init(settings.hashpower_init);
+#endif
     conn_init();
     preallocate = true;
     slabs_init(settings.maxbytes, settings.factor, preallocate);

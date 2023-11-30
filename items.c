@@ -270,9 +270,9 @@ static void item_unlink_q(item *it) {
 int do_item_link(item *it, const uint32_t hv) {
     MEMCACHED_ITEM_LINK(ITEM_key(it), it->nkey, it->nbytes);
 
-    //mutex_lock(&cache_lock);
+    mutex_lock(&cache_lock);
     do_item_link_nolock(it, hv);
-    //mutex_unlock(&cache_lock);
+    mutex_unlock(&cache_lock);
 
     return 1;
 }

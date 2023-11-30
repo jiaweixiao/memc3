@@ -1,7 +1,7 @@
 #ifndef __MEMC3_CONFIG__
 #define __MEMC3_CONFIG__
 
-//#define MEMC3_ASSOC_CHAIN 1  
+// #define MEMC3_ASSOC_CHAIN 1
 #define MEMC3_ASSOC_CUCKOO 1
 
 /*
@@ -12,8 +12,8 @@
 #endif
 
 
-//#define MEMC3_CACHE_LRU 1
-#define MEMC3_CACHE_CLOCK 1
+#define MEMC3_CACHE_LRU 1
+// #define MEMC3_CACHE_CLOCK 1
 #if (MEMC3_CACHE_LRU + MEMC3_CACHE_CLOCK != 1)
 #error "you must specify one and only one eviction policy"
 #endif
@@ -27,7 +27,7 @@
 /*
  * enable key comparison by casting bits into ints
  */
-#define MEMC3_ENABLE_INT_KEYCMP
+#define MEMC3_ENABLE_INT_KEYCMP 1
 
 /*
  * disable locking
@@ -58,7 +58,7 @@
 /*
  * enable tag 
  */
-#define MEMC3_ENABLE_TAG
+#define MEMC3_ENABLE_TAG 1
 
 /*
  * enable parallel cuckoo
